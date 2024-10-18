@@ -469,8 +469,8 @@ class UpdateApp(BaseApp):
             "v9-240625-amd64": "4.8.0",
             "v9-240730-amd64": "4.8.0",
             "v9-240827-amd64": "4.8.0",
-            "v9-241003-amd64": "4.8.0"
-            
+            "v9-241003-amd64": "4.8.0",
+            "v9-241107-amd64": "5.0.0"
         }
 
         with Halo(text='Checking for IBM Cloud Pak for Data', spinner=self.spinner) as h:
@@ -498,6 +498,9 @@ class UpdateApp(BaseApp):
 
                     currentCpdVersionMajorMinor = f"{cpdInstanceVersion.split('.')[0]}.{cpdInstanceVersion.split('.')[1]}"
                     targetCpdVersionMajorMinor = f"{cpdTargetVersion.split('.')[0]}.{cpdTargetVersion.split('.')[1]}"
+
+                    if currentCpdVersionMajorMinor < "4.8" and targetCpdVersionMajorMinor >= "5.0":
+                        self.fatalError(f"IBM Cloud Pak for Data {cpdInstanceVersion} cannot be upgraded directly to {cpdTargetVersion} update to a catalog version between v9-240625-amd64 and v9-241003-amd64 (inclusive)")
 
                     if cpdInstanceVersion < cpdTargetVersion:
                         # We have to update CP4D
