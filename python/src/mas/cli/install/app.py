@@ -568,7 +568,6 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             self.printDescription([
                 "Assist requires access to Cloud Object Storage (COS), this install supports automatic setup using either IBMCloud COS or in-cluster COS via OpenShift Container Storage/OpenShift Data Foundation (OCS/ODF)"
             ])
-            self.configCP4D()
             self.promptForString("COS Provider [ibm/ocs]", "cos_type")
             if self.getParam("cos_type") == "ibm":
                 self.promptForString("IBM Cloud API Key", "ibmcloud_apikey", isPassword=True)
