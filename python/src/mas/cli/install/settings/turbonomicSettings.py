@@ -10,7 +10,6 @@
 
 from mas.devops.mas import isAirgapInstall
 
-
 class TurbonomicSettingsMixin():
 
     def configTurbonomic(self) -> None:

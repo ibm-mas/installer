@@ -58,14 +58,15 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         try:
             catalog = catalogsAPI.get(name="ibm-operator-catalog", namespace="openshift-marketplace")
             catalogDisplayName = catalog.spec.displayName
+            #For s390x support adding self.architecture
 
-            m = re.match(r".+(?P<catalogId>v[89]-(?P<catalogVersion>[0-9]+)-amd64)", catalogDisplayName)
+            m = re.match(r".+(?P<catalogId>v[89]-(?P<catalogVersion>[0-9]+)-{self.architecture})", catalogDisplayName)
             if m:
                 # catalogId = v8-yymmdd-amd64
                 # catalogVersion = yymmdd
                 catalogId = m.group("catalogId")
-            elif re.match(r".+v8-amd64", catalogDisplayName):
-                catalogId = "v8-amd64"
+            elif re.match(r".+v8-{self.architecture}", catalogDisplayName):
+                catalogId = "v8-{self.architecture}"
             else:
                 self.fatalError(f"IBM Maximo Operator Catalog is already installed on this cluster. However, it is not possible to identify its version. If you wish to install a new MAS instance using the {self.getParam('mas_catalog_version')} catalog please first run 'mas update' to switch to this catalog, this will ensure the appropriate actions are performed as part of the catalog update")
 
@@ -136,17 +137,18 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         self.setParam("cert_manager_provider", "redhat")
         self.setParam("cert_manager_action", "install")
 
-    def configCatalog(self):
+    def configCatalog(self,installoption):
         self.printH1("IBM Maximo Operator Catalog Selection")
         if self.devMode:
-            self.promptForString("Select catalog source", "mas_catalog_version", default="v9-master-amd64")
+            self.promptForString("Select catalog source", "mas_catalog_version", default=f"v9-master-{self.architecture}")
             self.promptForString("Select channel", "mas_channel", default="9.1.x-dev")
         else:
-            print(tabulate(self.installOptions, headers="keys", tablefmt="simple_grid"))
+            print(tabulate(installoption, headers="keys", tablefmt="simple_grid"))
             catalogSelection = self.promptForInt("Select catalog and release", default=1)
 
-            self.setParam("mas_catalog_version", self.installOptions[catalogSelection - 1]["catalog"])
-            self.setParam("mas_channel", self.installOptions[catalogSelection - 1]["release"])
+            self.setParam("mas_catalog_version", installoption[catalogSelection-1]["catalog"])
+            self.setParam("mas_channel", installoption[catalogSelection-1]["release"])
+            self.setParam("mas_app_channel_manage", installoption[catalogSelection-1]["manage"])
 
     def configSLS(self) -> None:
         self.printH1("Configure Product License")
@@ -161,6 +163,7 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         if self.localConfigDir is None:
             # You need to tell us where the configuration file can be found
             self.localConfigDir = self.promptForDir("Select Local configuration directory")
+            self.setParam("mas_config_dir", self.localConfigDir)
 
     def configGrafana(self) -> None:
         try:
@@ -180,10 +183,6 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             else:
                 self.promptForString("Install namespace", "grafana_v5_namespace", default="grafana5")
                 self.promptForString("Grafana storage size", "grafana_instance_storage_size", default="10Gi")
-
-    def configMongoDb(self) -> None:
-        self.printH1("Configure MongoDb")
-        self.promptForString("Install namespace", "mongodb_namespace", default="mongoce")
 
     def configSpecialCharacters(self):
         self.printH1("Configure special characters for userID and username")
@@ -412,50 +411,63 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
 
     def configApps(self):
         self.printH1("Application Selection")
-        self.installIoT = self.yesOrNo("Install IoT")
-
-        if self.installIoT:
-            self.configAppChannel("iot")
-            self.installMonitor = self.yesOrNo("Install Monitor")
-        else:
-            self.installMonitor = False
-
-        if self.installMonitor:
-            self.configAppChannel("monitor")
-
         self.installManage = self.yesOrNo("Install Manage")
+        if self.architecture == 's390x':
+            if self.installManage:
+                self.configAppChannel("manage")
 
-        if self.installManage:
-            self.configAppChannel("manage")
+        if not self.preview:
+            self.installIoT = self.yesOrNo("Install IoT")
+            if self.installIoT:
+                self.configAppChannel("iot")
+                self.installMonitor = self.yesOrNo("Install Monitor")
+            else:
+                self.installMonitor = False
 
-        # Predict for MAS 8.10 is effectively unsupported now, because it has not shipped support for Cloud Pak for Data 4.8 as of June 2023 catalog update
-        if self.installIoT and self.installManage and self.getParam("mas_channel") != "8.10.x":
-            self.installPredict = self.yesOrNo("Install Predict")
+            if self.installMonitor:
+                self.configAppChannel("monitor")
+
+            if self.installManage:
+                self.configAppChannel("manage")
+
+            # Predict for MAS 8.10 is effectively unsupported now, because it has not shipped support for Cloud Pak for Data 4.8 as of June 2023 catalog update
+
+            if self.installIoT and self.installManage and self.getParam("mas_channel") != "8.10.x":
+                self.installPredict = self.yesOrNo("Install Predict")
+            else:
+                self.installPredict = False
+
+            if self.installPredict:
+                self.configAppChannel("predict")
+
+            # Assist is only installable on MAS 9.0.x due to withdrawal of support for Watson Discovery in our managed dependency stack and the inability of Assist 8.x to support this
+            if not self.getParam("mas_channel").startswith("8."):
+                self.installAssist = self.yesOrNo("Install Assist")
+                if self.installAssist:
+                    self.configAppChannel("assist")
+            else:
+                self.installAssist = False
+
+            self.installOptimizer = self.yesOrNo("Install Optimizer")
+            if self.installOptimizer:
+                self.configAppChannel("optimizer")
+
+            self.installInspection = self.yesOrNo("Install Visual Inspection")
+            if self.installInspection:
+                self.configAppChannel("visualinspection")
+
+            self.installAiBroker = self.yesOrNo("Install AI Broker")
+            if self.installAiBroker:
+                self.configAppChannel("aibroker")
+
         else:
             self.installPredict = False
-
-        if self.installPredict:
-            self.configAppChannel("predict")
-
-        # Assist is only installable on MAS 9.0.x due to withdrawal of support for Watson Discovery in our managed dependency stack and the inability of Assist 8.x to support this
-        if not self.getParam("mas_channel").startswith("8."):
-            self.installAssist = self.yesOrNo("Install Assist")
-            if self.installAssist:
-                self.configAppChannel("assist")
-        else:
             self.installAssist = False
-
-        self.installOptimizer = self.yesOrNo("Install Optimizer")
-        if self.installOptimizer:
-            self.configAppChannel("optimizer")
-
-        self.installInspection = self.yesOrNo("Install Visual Inspection")
-        if self.installInspection:
-            self.configAppChannel("visualinspection")
-
-        self.installAiBroker = self.yesOrNo("Install AI Broker")
-        if self.installAiBroker:
-            self.configAppChannel("aibroker")
+            self.installOptimizer = False
+            self.installInspection = False
+            self.installMonitor = False
+            self.installIoT = False
+            self.installAiBroker = False
 
     def configAppChannel(self, appId):
         versions = self.getCompatibleVersions(self.params["mas_channel"], appId)
@@ -578,8 +590,12 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         # Interactive mode
         self.interactiveMode = True
 
-        # Catalog
-        self.configCatalog()
+        # Catalog for multi-architecture
+        if not self.preview:
+            self.configCatalog(self.installOptions_amd64)
+        else:
+            self.configCatalog(self.installOptions_s390x)
+
         if not self.devMode:
             self.validateCatalogSource()
             self.licensePrompt()
@@ -600,19 +616,26 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         self.configApps()
         self.validateInternalRegistryAvailable()
         # Note: manageSettings(), predictSettings(), or assistSettings() functions can trigger configCP4D()
+        #Installs only manage, no manage components for s390x
         self.manageSettings()
-        self.optimizerSettings()
-        self.predictSettings()
-        self.assistSettings()
-        self.aibrokerSettings()
+
+        if not self.preview:
+            self.optimizerSettings()
+            self.predictSettings()
+            self.assistSettings()
+            self.aibrokerSettings()
 
         # Dependencies
         self.configMongoDb()  # Will only do anything if IoT or Manage have been selected for install
         self.configDb2()
-        self.configKafka()  # Will only do anything if IoT has been selected for install
-
-        self.configGrafana()
-        self.configTurbonomic()
+        # Disable Grafana for s390x
+        if not self.preview:
+            self.configKafka()  # Will only do anything if IoT has been selected for install
+            self.configGrafana()
+            self.configTurbonomic()
+        else:
+            self.setParam("grafana_action", "none")
+            pass  # Skip Turbonomic configuration#
 
         # TODO: Support ECK integration via the interactive install mode
         # TODO: Support MAS superuser username/password via the interactive install mode
@@ -645,8 +668,8 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             "approval_predict": {"id": "app-cfg-predict"},  # After Predict workspace has been configured
             "approval_visualinspection": {"id": "app-cfg-visualinspection"}  # After Visual Inspection workspace has been configured
         }
-
-        self.configGrafana()
+        if not self.preview:
+            self.configGrafana()
 
         requiredParams = [
             # MAS
@@ -693,10 +716,12 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             "mas_app_settings_secondary_langs",
             "mas_app_settings_server_timezone",
             "ocp_ingress_tls_secret_name",
+            "mas_architecture",
             # DRO
             "dro_namespace",
             # MongoDb
             "mongodb_namespace",
+            "mongodb_action"
             # Db2
             "db2_action_system",
             "db2_action_manage",
@@ -838,15 +863,15 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                     self.setParam("mas_pod_templates_dir", value)
 
             elif key == "assist_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_assist", value)
                     self.installAssist = True
             elif key == "iot_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_iot", value)
                     self.installIoT = True
             elif key == "monitor_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_monitor", value)
                     self.installMonitor = True
             elif key == "manage_channel":
@@ -854,24 +879,24 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                     self.setParam("mas_app_channel_manage", value)
                     self.installManage = True
             elif key == "predict_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_predict", value)
                     self.installPredict = True
                     self.deployCP4D = True
             elif key == "visualinspection_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_visualinspection", value)
                     self.installInspection = True
             elif key == "aibroker_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_aibroker", value)
                     self.installAiBroker = True
             elif key == "optimizer_channel":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_channel_optimizer", value)
                     self.installOptimizer = True
             elif key == "optimizer_plan":
-                if value is not None:
+                if value is not None and self.architecture != 's390x':
                     self.setParam("mas_app_plan_optimizer", value)
 
             # Manage advanced settings that need extra processing
@@ -959,7 +984,24 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         if args.skip_pre_check:
             self.setParam("skip_pre_check", "true")
 
-        self.installOptions = [
+        #Setting for Install option for s390x - using dev catalogs
+        self.installOptions_s390x = [
+            {
+                "#": 1,
+                "catalog": "v9-multiarch-new-s390x",
+                "release": "9.0.x",
+                "core": "9.0.2",
+                "assist": "9.0.2",
+                "iot": "9.0.2",
+                "manage": "9.0.2",
+                "monitor": "9.0.2",
+                "optimizer": "9.0.2",
+                "predict": "9.0.1",
+                "inspection": "9.0.2"
+            }
+        ]
+
+        self.installOptions_amd64 = [
             {
                 "#": 1,
                 "catalog": "v9-241003-amd64",
@@ -1106,9 +1148,11 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             self.nonInteractiveMode()
 
         # After we've configured the basic inputs, we can calculate these ones
-        self.setIoTStorageClasses()
-        if self.deployCP4D:
-            self.configCP4D()
+        if not self.preview:
+            if self.installIoT:
+                self.setIoTStorageClasses()
+            if self.deployCP4D:
+                self.configCP4D()
 
         # The entitlement file for SLS is mounted as a secret in /workspace/entitlement
         entitlementFileBaseName = path.basename(self.slsLicenseFileLocal)

@@ -18,6 +18,7 @@ from sys import exit
 from subprocess import PIPE, Popen, TimeoutExpired
 import threading
 import json
+import os
 
 # Use of the openshift client rather than the kubernetes client allows us access to "apply"
 from kubernetes import config
@@ -305,12 +306,24 @@ class BaseApp(PrintMixin, PromptMixin):
             token = prompt(HTML('<Yellow>Login Token:</Yellow> '), is_password=True, placeholder="sha256~...")
             skipVerify = self.yesOrNo('Disable TLS Verify')
             connect(server, token, skipVerify)
-            self.reloadDynamicClient()
-            if self._dynClient is None:
+        self.setPreview()
+        self.reloadDynamicClient()
+        if self._dynClient is None:
                 print_formatted_text(HTML("<Red>Unable to connect to cluster.  See log file for details</Red>"))
                 exit(1)
 
-    def initializeApprovalConfigMap(self, namespace: str, id: str, key: str = None, maxRetries: int = 100, delay: int = 300, ignoreFailure: bool = True) -> None:
+# for s390x architecture
+    def setPreview(self):
+        command = "oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}'"
+        self.architecture = os.popen(command).read().strip()
+        if self.architecture == 's390x':
+            self.preview = True
+            self.printTitle(f"\n Architecture : {self.architecture}")
+        else:
+           self.preview = False
+           self.printTitle(f"\n Architecture : {self.architecture}")
+
+    def initializeApprovalConfigMap(self, namespace: str, id: str, key: str=None, maxRetries: int=100, delay: int=300, ignoreFailure: bool=True) -> None:
         """
         Set key = None if you don't want approval workflow enabled
         """
