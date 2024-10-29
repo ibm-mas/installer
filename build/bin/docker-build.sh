@@ -68,18 +68,18 @@ if [[ "$TARGET_PLATFORM" == "" ]] || [[ "$TARGET_PLATFORM" == "amd64" ]]; then
   fi
 
 # Remove expires-after for release builds (only pre-release builds should auto-expire)
-if [[ ! "$DOCKER_TAG" == *"-pre."* ]]; then
-  echo "Removing quay.expires-after label from Dockerfile"
-  sed -i "/quay.expires-after/d" $DOCKERFILE
-fi
+  if [[ ! "$DOCKER_TAG" == *"-pre."* ]]; then
+    echo "Removing quay.expires-after label from Dockerfile"
+    sed -i "/quay.expires-after/d" $DOCKERFILE
+  fi
 
-docker build \
-  --build-arg ARCHITECTURE=amd64 \
-  --build-arg VERSION_LABEL=$DOCKER_TAG \
-  --build-arg RELEASE_LABEL=$GITHUB_RUN_ID \
-  --build-arg VCS_REF=$GITHUB_SHA \
-  --build-arg VCS_URL=https://github.com/$GITHUB_REPOSITORY \
-   -t $LOCAL_TAG $EXTRA_PARAMS -f $DOCKERFILE $BUILDPATH
+  docker build \
+    --build-arg ARCHITECTURE=amd64 \
+    --build-arg VERSION_LABEL=$DOCKER_TAG \
+    --build-arg RELEASE_LABEL=$GITHUB_RUN_ID \
+    --build-arg VCS_REF=$GITHUB_SHA \
+    --build-arg VCS_URL=https://github.com/$GITHUB_REPOSITORY \
+     -t $LOCAL_TAG $EXTRA_PARAMS -f $DOCKERFILE $BUILDPATH
 else
   LOCAL_TAG=$NAMESPACE/$IMAGE:$DOCKER_TAG-$TARGET_PLATFORM
   echo_highlight "Running multi-architecture build using docker buildx >>>"
@@ -87,9 +87,9 @@ else
     --load \
     --platform linux/$TARGET_PLATFORM \
     --build-arg ARCHITECTURE=$TARGET_PLATFORM \
-  --build-arg VERSION_LABEL=$DOCKER_TAG \
-  --build-arg RELEASE_LABEL=$GITHUB_RUN_ID \
-  --build-arg VCS_REF=$GITHUB_SHA \
-  --build-arg VCS_URL=https://github.com/$GITHUB_REPOSITORY \
+    --build-arg VERSION_LABEL=$DOCKER_TAG \
+    --build-arg RELEASE_LABEL=$GITHUB_RUN_ID \
+    --build-arg VCS_REF=$GITHUB_SHA \
+    --build-arg VCS_URL=https://github.com/$GITHUB_REPOSITORY \
     -t $LOCAL_TAG $EXTRA_PARAMS -f $DOCKERFILE $BUILDPATH || exit 1
 fi
