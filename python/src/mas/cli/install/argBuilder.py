@@ -222,6 +222,10 @@ class installArgBuilderMixin():
                 command += " --cp4d-install-openscal"
             if self.getParam('cpd_install_cognos') == "install":
                 command += " --cp4d-install-cognos"
+            if self.getParam('cpd_install_all') == "install":
+                command += " --cp4d-install-spss"
+                command += " --cp4d-install-openscal"
+                command += " --cp4d-install-cognos"
             command += newline
 
         # IBM Db2 Universal Operator
