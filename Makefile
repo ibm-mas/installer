@@ -12,11 +12,11 @@ ansible-install:
 ansible: ansible-build ansible-install
 
 python-cli:
-	cd python && python3 -m build
+	cd python && python -m build
 	cp python/dist/mas_cli-100.0.0.tar.gz image/cli/install/mas_cli.tar.gz
 
 python-devops:
-	cd ../python-devops && python3 -m build
+	cd ../python-devops && python -m build
 	cp ../python-devops/dist/mas_devops-100.0.0.tar.gz image/cli/install/mas_devops.tar.gz
 
 python: python-devops python-cli
