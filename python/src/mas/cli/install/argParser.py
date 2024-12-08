@@ -942,6 +942,30 @@ cosArgGroup.add_argument(
     required=False,
     help="When using IBM COS, set COS priviledged apikey for IBM Cloud"
 )
+cosArgGroup.add_argument(
+    "--cos-use-hmac",
+    dest="cos_use_hmac",
+    required=False,
+    help="Add help description here"
+)
+cosArgGroup.add_argument(
+    "--cos-instance-name",
+    dest="cos_instance_name",
+    required=False,
+    help="Add help description here"
+)
+cosArgGroup.add_argument(
+    "--cos-action",
+    dest="cos_action",
+    required=False,
+    help="Add help description here"
+)
+cosArgGroup.add_argument(
+    "--cos-bucket-name",
+    dest="cos_bucket_name",
+    required=False,
+    help="Add help description here"
+)
 
 # Turbonomic Integration
 # -----------------------------------------------------------------------------

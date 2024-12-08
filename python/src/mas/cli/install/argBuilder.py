@@ -327,6 +327,14 @@ class installArgBuilderMixin():
                 command += f" --cos-resourcegroup \"{self.getParam('cos_resourcegroup')}\""
             if self.getParam('cos_apikey') != "":
                 command += f" --cos-apikey \"{self.getParam('cos_apikey')}\""
+            if self.getParam('cos_action') != "":
+                command += f" --cos-action \"{self.getParam('cos_action')}\""
+            if self.getParam('cos_use_hmac') != "":
+                command += f" --cos-use-hmac \"{self.getParam('cos_use_hmac')}\""
+            if self.getParam('cos_instance_name') != "":
+                command += f" --cos-instance-name \"{self.getParam('cos_instance_name')}\""
+            if self.getParam('cos_bucket_name') != "":
+                command += f" --cos-bucket-name \"{self.getParam('cos_bucket_name')}\""
             command += newline
 
         # Turbonomic Integration
