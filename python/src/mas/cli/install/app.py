@@ -168,19 +168,27 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         if self.architecture != "s390x":
             self.catalogCp4dVersion = self.chosenCatalog["cpd_product_version_default"]
 
+            applications = {
+                "Core": "mas_core_version",
+                "Manage": "mas_manage_version",
+                "IoT": "mas_iot_version",
+                "Monitor": "mas_monitor_version",
+                "Assist": "mas_assist_version",
+                "Optimizer": "mas_optimizer_version",
+                "Predict": "mas_predict_version",
+                "Inspection": "mas_visualinspection_version",
+            }
+        else:
+            applications = {
+                "Core": "mas_core_version",
+                "Manage": "mas_manage_version",
+            }
+
+
+
         self.catalogReleases = []
         self.catalogTable = []
 
-        applications = {
-            "Core": "mas_core_version",
-            "Manage": "mas_manage_version",
-            "IoT": "mas_iot_version",
-            "Monitor": "mas_monitor_version",
-            "Assist": "mas_assist_version",
-            "Optimizer": "mas_optimizer_version",
-            "Predict": "mas_predict_version",
-            "Inspection": "mas_visualinspection_version",
-        }
 
         # Dynamically fetch the channels from the chosen catalog
         # based on mas core
