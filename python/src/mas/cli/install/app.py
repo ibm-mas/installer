@@ -164,8 +164,9 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
     @logMethodCall
     def processCatalogChoice(self) -> list:
         self.catalogDigest = self.chosenCatalog["catalog_digest"]
-        self.catalogCp4dVersion = self.chosenCatalog["cpd_product_version_default"]
         self.catalogMongoDbVersion = self.chosenCatalog["mongo_extras_version_default"]
+        if self.architecture != "s390x":
+            self.catalogCp4dVersion = self.chosenCatalog["cpd_product_version_default"]
 
         self.catalogReleases = []
         self.catalogTable = []
