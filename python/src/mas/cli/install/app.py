@@ -199,15 +199,27 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         for application, key in applications.items():
             self.catalogTable.append({"": application} | self.chosenCatalog[key])
 
-        summary = [
-            "",
-            "<u>Catalog Details</u>",
-            f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
-            f"Catalog Digest:        {self.catalogDigest}",
-            f"MAS Releases:          {', '.join(self.catalogReleases)}",
-            f"Cloud Pak for Data:    {self.catalogCp4dVersion}",
-            f"MongoDb:               {self.catalogMongoDbVersion}",
-        ]
+
+        if self.architecture == "s390x":
+            summary = [
+                "",
+                "<u>Catalog Details</u>",
+                f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
+                f"Catalog Digest:        {self.catalogDigest}",
+                f"MAS Releases:          {', '.join(self.catalogReleases)}",
+                f"MongoDb:               {self.catalogMongoDbVersion}",
+            ]
+        else:
+            summary = [
+                "",
+                "<u>Catalog Details</u>",
+                f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
+                f"Catalog Digest:        {self.catalogDigest}",
+                f"MAS Releases:          {', '.join(self.catalogReleases)}",
+                f"Cloud Pak for Data:    {self.catalogCp4dVersion}",
+                f"MongoDb:               {self.catalogMongoDbVersion}",
+            ]
+
         return summary
 
     @logMethodCall
