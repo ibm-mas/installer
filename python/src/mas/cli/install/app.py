@@ -184,11 +184,8 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                 "Manage": "mas_manage_version",
             }
 
-
-
         self.catalogReleases = []
         self.catalogTable = []
-
 
         # Dynamically fetch the channels from the chosen catalog
         # based on mas core
@@ -198,7 +195,6 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         # Generate catalogTable
         for application, key in applications.items():
             self.catalogTable.append({"": application} | self.chosenCatalog[key])
-
 
         if self.architecture == "s390x":
             summary = [
