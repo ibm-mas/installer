@@ -142,6 +142,9 @@ optionalParams = [
     # Dev Mode
     "artifactory_username",
     "artifactory_token",
+    "mas_icr_cp",
+    "mas_icr_cpopen",
+    "sls_icr_cpopen",
     # TODO: The way arcgis has been implemented needs to be fixed
     "install_arcgis",
     "mas_arcgis_channel",
