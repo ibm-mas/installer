@@ -45,6 +45,7 @@ from mas.cli.validators import (
 
 from mas.devops.ocp import createNamespace, getStorageClasses
 from mas.devops.mas import getCurrentCatalog, getDefaultStorageClasses
+from mas.devops.sls import findSLSByNamespace
 from mas.devops.data import getCatalog
 from mas.devops.tekton import (
     installOpenShiftPipelines,
@@ -268,14 +269,49 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
 
     @logMethodCall
     def configSLS(self) -> None:
-        self.printH1("Configure Product License")
+        self.printH1("Configure AppPoint Licensing")
+        self.printDescription(
+            [
+                "By default the MAS instance will be configured to use a cluster-shared License, this provides a shared pool of AppPoints available to all MAS instances on the cluster.",
+                "",
+            ]
+        )
+
+        self.slsMode = 1
+        self.slsLicenseFileLocal = None
+
+        if self.showAdvancedOptions:
+            self.printDescription(
+                [
+                    "Alternatively you may choose to install using a dedicated license only available to this MAS instance.",
+                    "  1. Install MAS with Cluster-Shared License (AppPoints)",
+                    "  2. Install MAS with Dedicated License (AppPoints)",
+                ]
+            )
+            self.slsMode = self.promptForInt("SLS Mode", default=1)
+
+            if self.slsMode not in [1, 2]:
+                self.fatalError(f"Invalid selection: {self.slsMode}")
+
+        if not (self.slsMode == 2 and not self.getParam("sls_namespace")):
+            sls_namespace = "ibm-sls" if self.slsMode == 1 else self.getParam("sls_namespace")
+            if findSLSByNamespace(sls_namespace, dynClient=self.dynamicClient):
+                print_formatted_text(HTML(f"<MediumSeaGreen>SLS auto-detected: {sls_namespace}</MediumSeaGreen>"))
+                print()
+                if not self.yesOrNo("Upload/Replace the license file"):
+                    self.setParam("sls_action", "gencfg")
+                    return
+
         self.slsLicenseFileLocal = self.promptForFile("License file", mustExist=True, envVar="SLS_LICENSE_FILE_LOCAL")
+        self.setParam("sls_action", "install")
+
+    @logMethodCall
+    def configDRO(self) -> None:
         self.promptForString("Contact e-mail address", "uds_contact_email")
         self.promptForString("Contact first name", "uds_contact_firstname")
         self.promptForString("Contact last name", "uds_contact_lastname")
 
         if self.showAdvancedOptions:
-            self.promptForString("IBM Suite License Services (SLS) Namespace", "sls_namespace", default="ibm-sls")
             self.promptForString("IBM Data Reporter Operator (DRO) Namespace", "dro_namespace", default="redhat-marketplace")
 
     @logMethodCall
@@ -395,6 +431,9 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
             " - Must be 3-300 characters long"
         ])
         self.promptForString("Workspace name", "mas_workspace_name", validator=WorkspaceNameFormatValidator())
+
+        if self.slsMode == 2 and not self.getParam("sls_namespace"):
+            self.setParam("sls_namespace", f"mas-{self.getParam('mas_instance_id')}-sls")
 
         self.configOperationMode()
         self.configCATrust()
@@ -747,6 +786,7 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
 
         # Licensing (SLS and DRO)
         self.configSLS()
+        self.configDRO()
         self.configICRCredentials()
 
         # MAS Core
@@ -795,6 +835,7 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         self.deployCP4D = False
         self.db2SetAffinity = False
         self.db2SetTolerations = False
+        self.slsLicenseFileLocal = None
 
         self.approvals = {
             "approval_core": {"id": "suite-verify"},  # After Core Platform verification has completed
@@ -903,6 +944,14 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                     self.setParam(key, value)
                     if value in ["jms", "snojms"]:
                         self.setParam("mas_app_settings_persistent_volumes_flag", "true")
+            # SLS
+            elif key == "license_file":
+                if value is not None and value != "":
+                    self.slsLicenseFileLocal = value
+                    self.setParam("sls_action", "install")
+            elif key == "dedicated_sls":
+                if value:
+                    self.setParam("sls_namespace", f"mas-{self.args.mas_instance_id}-sls")
 
             # These settings are used by the CLI rather than passed to the PipelineRun
             elif key == "storage_accessmode":
@@ -913,10 +962,6 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                 if value is None:
                     self.fatalError(f"{key} must be set")
                 self.pipelineStorageClass = value
-            elif key == "license_file":
-                if value is None:
-                    self.fatalError(f"{key} must be set")
-                self.slsLicenseFileLocal = value
 
             elif key.startswith("approval_"):
                 if key not in self.approvals:
@@ -954,6 +999,13 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         # Load the catalog information
         self.chosenCatalog = getCatalog(self.getParam("mas_catalog_version"))
 
+        # License file is only optional for existing SLS instance
+        if self.slsLicenseFileLocal is None:
+            if findSLSByNamespace(self.getParam("sls_namespace"), dynClient=self.dynamicClient):
+                self.setParam("sls_action", "gencfg")
+            else:
+                self.fatalError(f"--license-file must be set for new SLS install")
+
         # Once we've processed the inputs, we should validate the catalog source & prompt to accept the license terms
         if not self.devMode:
             self.validateCatalogSource()
@@ -976,6 +1028,10 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         self.licenseAccepted = args.accept_license
         self.devMode = args.dev_mode
         self.skipGrafanaInstall = args.skip_grafana_install
+
+        # Set image_pull_policy of the CLI in interactive mode
+        if args.image_pull_policy and args.image_pull_policy != "":
+            self.setParam("image_pull_policy", args.image_pull_policy)
 
         self.approvals = {}
 
@@ -1024,13 +1080,10 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         if self.deployCP4D:
             self.configCP4D()
 
-        # The entitlement file for SLS is mounted as a secret in /workspace/entitlement
-        entitlementFileBaseName = path.basename(self.slsLicenseFileLocal)
-        self.setParam("sls_entitlement_file", f"/workspace/entitlement/{entitlementFileBaseName}")
-
-        # Set up the secrets for additional configs, podtemplates and manual certificates
+        # Set up the secrets for additional configs, podtemplates, sls license file and manual certificates
         self.additionalConfigs()
         self.podTemplates()
+        self.slsLicenseFile()
         self.manualCertificates()
 
         # Show a summary of the installation configuration
@@ -1082,7 +1135,7 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
                 prepareInstallSecrets(
                     dynClient=self.dynamicClient,
                     instanceId=self.getParam("mas_instance_id"),
-                    slsLicenseFile=self.slsLicenseFileLocal,
+                    slsLicenseFile=self.slsLicenseFileSecret,
                     additionalConfigs=self.additionalConfigsSecret,
                     podTemplates=self.podTemplatesSecret,
                     certs=self.certsSecret
