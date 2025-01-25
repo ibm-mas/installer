@@ -14,6 +14,7 @@ AWS Credentials (Required):
   -k, --secretkey ${COLOR_YELLOW}AWS_SECRET_ACCESS_KEY${TEXT_RESET}         AWS SECRET ACCESS KEY
 
 Cluster Configuration (Required):
+  -m, --sno-mode ${COLOR_YELLOW}SNO_MODE${TEXT_RESET}                       Enable SNO Mode by setting single node openshift
   -c, --cluster-name ${COLOR_YELLOW}CLUSTER_NAME${TEXT_RESET}               Name of the cluster to be provisioned
   -v, --ocp-version ${COLOR_YELLOW}OCP_VERSION${TEXT_RESET}                 OCP version to use (e.g 4.15_openshift, 4.16_openshift)
 
@@ -54,6 +55,9 @@ function provision_aws_noninteractive() {
       -d|--domain-name)
         export IPI_BASE_DOMAIN=$1 && shift
         ;;
+      -m|--sno-mode)
+        export SNO_MODE=$1 && shift
+        ;;
       --no-confirm)
         export NO_CONFIRM=true
         ;;
@@ -93,6 +97,7 @@ function set_default_vars() {
 function set_sno_vars() {
   export IPI_CONTROLPLANE_REPLICAS=1  # IPI_CONTROLPLANE_REPLICAS
   export IPI_COMPUTE_REPLICAS=0       # IPI_COMPUTE_REPLICAS
+  export IPI_ROOTVOLUME_SIZE=250      # IPI_ROOTVOLUME_SIZE 
 }
 
 # function provision_aws_interactive contains the prompts for the different variables.
