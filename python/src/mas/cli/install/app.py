@@ -112,19 +112,11 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
 
     @logMethodCall
     def licensePrompt(self):
-        licenses = {
-            "8.9.x": " - <u>https://ibm.biz/MAS89-License</u>",
-            "8.10.x": " - <u>https://ibm.biz/MAS810-License</u>",
-            "8.11.x": " - <u>https://ibm.biz/MAS811-License</u>\n - <u>https://ibm.biz/MAXIT81-License</u>",
-            "9.0.x": " - <u>https://ibm.biz/MAS90-License</u>\n - <u>https://ibm.biz/MaximoIT90-License</u>\n - <u>https://ibm.biz/MAXArcGIS90-License</u>",
-            "9.1.x-feature": " - <u>https://ibm.biz/MAS90-License</u>\n - <u>https://ibm.biz/MaximoIT90-License</u>\n - <u>https://ibm.biz/MAXArcGIS90-License</u>\n\n - Be aware, this channel subscription is supported for non-production use only.  It allows early access to new features for evaluation is non-production environments. This subscription is offered alongside and in parallel with our normal maintained streams.  When using this subscription, IBM Support will only accept cases for the latest available bundle deployed in a non-production environment. Severity must be either 3 or 4 and cases cannot be escalated.  Please refer to IBM documentation for more details.\n",
-        }
-
         if not self.licenseAccepted:
             self.printH1("License Terms")
             self.printDescription([
                 "To continue with the installation, you must accept the license terms:",
-                licenses[self.getParam('mas_channel')]
+                self.licenses[self.getParam('mas_channel')]
             ])
 
             if self.noConfirm:
@@ -172,75 +164,58 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
     @logMethodCall
     def processCatalogChoice(self) -> list:
         self.catalogDigest = self.chosenCatalog["catalog_digest"]
-        self.catalogCp4dVersion = self.chosenCatalog["cpd_product_version_default"]
         self.catalogMongoDbVersion = self.chosenCatalog["mongo_extras_version_default"]
+        if self.architecture != "s390x":
+            self.catalogCp4dVersion = self.chosenCatalog["cpd_product_version_default"]
 
-        self.catalogReleases = ["9.0.x", "8.11.x", "8.10.x"]
-
-        self.catalogTable = [
-            {
-                "": "Core",
-                "9.1.x-feature": self.chosenCatalog["mas_core_version"]["9.1.x-feature"],
-                "9.0.x": self.chosenCatalog["mas_core_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_core_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_core_version"]["8.10.x"]
-            },
-            {
-                "": "Manage",
-                "9.1.x-feature": self.chosenCatalog["mas_manage_version"]["9.1.x-feature"],
-                "9.0.x": self.chosenCatalog["mas_manage_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_manage_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_manage_version"]["8.10.x"]
-            },
-            {
-                "": "IoT",
-                "9.0.x": self.chosenCatalog["mas_iot_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_iot_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_iot_version"]["8.10.x"]
-            },
-            {
-                "": "Monitor",
-                "9.0.x": self.chosenCatalog["mas_monitor_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_monitor_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_monitor_version"]["8.10.x"]
-            },
-            {
-                "": "Assist",
-                "9.0.x": self.chosenCatalog["mas_assist_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_assist_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_assist_version"]["8.10.x"]
-            },
-            {
-                "": "Optimizer",
-                "9.1.x-feature": self.chosenCatalog["mas_optimizer_version"]["9.1.x-feature"],
-                "9.0.x": self.chosenCatalog["mas_optimizer_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_optimizer_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_optimizer_version"]["8.10.x"]
-            },
-            {
-                "": "Predict",
-                "9.0.x": self.chosenCatalog["mas_predict_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_predict_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_predict_version"]["8.10.x"]
-            },
-            {
-                "": "Inspection",
-                "9.1.x-feature": self.chosenCatalog["mas_visualinspection_version"]["9.1.x-feature"],
-                "9.0.x": self.chosenCatalog["mas_visualinspection_version"]["9.0.x"],
-                "8.11.x": self.chosenCatalog["mas_visualinspection_version"]["8.11.x"],
-                "8.10.x": self.chosenCatalog["mas_visualinspection_version"]["8.10.x"]
+            applications = {
+                "Core": "mas_core_version",
+                "Manage": "mas_manage_version",
+                "IoT": "mas_iot_version",
+                "Monitor": "mas_monitor_version",
+                "Assist": "mas_assist_version",
+                "Optimizer": "mas_optimizer_version",
+                "Predict": "mas_predict_version",
+                "Inspection": "mas_visualinspection_version",
             }
-        ]
+        else:
+            applications = {
+                "Core": "mas_core_version",
+                "Manage": "mas_manage_version",
+            }
 
-        summary = [
-            "",
-            "<u>Catalog Details</u>",
-            f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
-            f"Catalog Digest:        {self.catalogDigest}",
-            f"MAS Releases:          {', '.join(self.catalogReleases)}",
-            f"Cloud Pak for Data:    {self.catalogCp4dVersion}",
-            f"MongoDb:               {self.catalogMongoDbVersion}",
-        ]
+        self.catalogReleases = []
+        self.catalogTable = []
+
+        # Dynamically fetch the channels from the chosen catalog
+        # based on mas core
+        for channel in self.chosenCatalog["mas_core_version"]:
+            self.catalogReleases.append(channel)
+
+        # Generate catalogTable
+        for application, key in applications.items():
+            self.catalogTable.append({"": application} | self.chosenCatalog[key])
+
+        if self.architecture == "s390x":
+            summary = [
+                "",
+                "<u>Catalog Details</u>",
+                f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
+                f"Catalog Digest:        {self.catalogDigest}",
+                f"MAS Releases:          {', '.join(self.catalogReleases)}",
+                f"MongoDb:               {self.catalogMongoDbVersion}",
+            ]
+        else:
+            summary = [
+                "",
+                "<u>Catalog Details</u>",
+                f"Catalog Image:         icr.io/cpopen/ibm-maximo-operator-catalog:{self.getParam('mas_catalog_version')}",
+                f"Catalog Digest:        {self.catalogDigest}",
+                f"MAS Releases:          {', '.join(self.catalogReleases)}",
+                f"Cloud Pak for Data:    {self.catalogCp4dVersion}",
+                f"MongoDb:               {self.catalogMongoDbVersion}",
+            ]
+
         return summary
 
     @logMethodCall
@@ -693,9 +668,12 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
     def optimizerSettings(self) -> None:
         if self.installOptimizer:
             self.printH1("Configure Maximo Optimizer")
-            self.printDescription(["Customize your Optimizer installation, 'full' and 'limited' install plans are available, refer to the product documentation for more information"])
-
-            self.promptForString("Plan [full/limited]", "mas_app_plan_optimizer", default="full", validator=OptimizerInstallPlanValidator())
+            if self.isSNO():
+                self.printDescription(["Using Optimizer 'limited' plan as it is being installed in a single node cluster"])
+                self.setParam("mas_app_plan_optimizer", "limited")
+            else:
+                self.printDescription(["Customize your Optimizer installation, 'full' and 'limited' install plans are available, refer to the product documentation for more information"])
+                self.promptForString("Plan [full/limited]", "mas_app_plan_optimizer", default="full", validator=OptimizerInstallPlanValidator())
 
     @logMethodCall
     def predictSettings(self) -> None:
@@ -946,16 +924,15 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
 
                 if value != "":
                     valueParts = value.split(":")
-                    if len(valueParts) != 4:
-                        self.fatalError(f"Unsupported format for {key} ({value}).  Expected APPROVAL_KEY:MAX_RETRIES:RETRY_DELAY:IGNORE_FAILURE")
+                    if len(valueParts) != 3:
+                        self.fatalError(f"Unsupported format for {key} ({value}).  Expected MAX_RETRIES:RETRY_DELAY:IGNORE_FAILURE")
                     else:
                         try:
-                            self.approvals[key]["approvalKey"] = valueParts[0]
-                            self.approvals[key]["maxRetries"] = int(valueParts[1])
-                            self.approvals[key]["retryDelay"] = int(valueParts[2])
-                            self.approvals[key]["ignoreFailure"] = bool(valueParts[3])
+                            self.approvals[key]["maxRetries"] = int(valueParts[0])
+                            self.approvals[key]["retryDelay"] = int(valueParts[1])
+                            self.approvals[key]["ignoreFailure"] = bool(valueParts[2])
                         except ValueError:
-                            self.fatalError(f"Unsupported format for {key} ({value}).  Expected string:int:int:boolean")
+                            self.fatalError(f"Unsupported format for {key} ({value}).  Expected int:int:boolean")
 
             # Arguments that we don't need to do anything with
             elif key in ["accept_license", "dev_mode", "skip_pre_check", "skip_grafana_install", "no_confirm", "no_wait_for_pvc", "help", "advanced", "simplified"]:
@@ -1020,6 +997,10 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
         if self.dynamicClient is None:
             print_formatted_text(HTML("<Red>Error: The Kubernetes dynamic Client is not available.  See log file for details</Red>"))
             exit(1)
+
+        # Perform a check whether the cluster is set up for airgap install, this will trigger an early failure if the cluster is using the now
+        # deprecated MaximoApplicationSuite ImageContentSourcePolicy instead of the new ImageDigestMirrorSet
+        self.isAirgap()
 
         # Configure the installOptions for the appropriate architecture
         self.catalogOptions = supportedCatalogs[self.architecture]
@@ -1136,11 +1117,11 @@ class InstallApp(BaseApp, InstallSettingsMixin, InstallSummarizerMixin, ConfigGe
          - present with the chosen state field initialized to ""
         """
         for approval in self.approvals.values():
-            if "approvalKey" in approval:
+            if "maxRetries" in approval:
                 # Enable this approval workload
-                logger.debug(f"Approval workflow for {approval['id']} will be enabled during install ({approval['maxRetries']} / {approval['retryDelay']}s / {approval['approvalKey']} / {approval['ignoreFailure']})")
-                self.initializeApprovalConfigMap(namespace, approval['id'], approval['approvalKey'], approval['maxRetries'], approval['retryDelay'], approval['ignoreFailure'])
+                logger.debug(f"Approval workflow for {approval['id']} will be enabled during install ({approval['maxRetries']} / {approval['retryDelay']}s / {approval['ignoreFailure']})")
+                self.initializeApprovalConfigMap(namespace, approval['id'], True, approval['maxRetries'], approval['retryDelay'], approval['ignoreFailure'])
             else:
                 # Disable this approval workload
                 logger.debug(f"Approval workflow for {approval['id']} will be disabled during install")
-                self.initializeApprovalConfigMap(namespace, approval['id'])
+                self.initializeApprovalConfigMap(namespace, approval['id'], False)

@@ -138,6 +138,7 @@ class BaseApp(PrintMixin, PromptMixin):
         self.certsSecret = None
 
         self._isSNO = None
+        self._isAirgap = None
 
         # Until we connect to the cluster we don't know what architecture it's worker nodes are
         self.architecture = None
@@ -182,6 +183,21 @@ class BaseApp(PrintMixin, PromptMixin):
                 "predict": ["8.8.x", "8.7.x"],
                 "visualinspection": ["8.8.x", "8.7.x"],
             },
+        }
+
+        self.licenses = {
+            "8.9.x": " - <u>https://ibm.biz/MAS89-License</u>",
+            "8.10.x": " - <u>https://ibm.biz/MAS810-License</u>",
+            "8.11.x": " - <u>https://ibm.biz/MAS811-License</u>\n - <u>https://ibm.biz/MAXIT81-License</u>",
+            "9.0.x": " - <u>https://ibm.biz/MAS90-License</u>\n - <u>https://ibm.biz/MaximoIT90-License</u>\n - <u>https://ibm.biz/MAXArcGIS90-License</u>",
+            "9.1.x-feature": " - <u>https://ibm.biz/MAS90-License</u>\n - <u>https://ibm.biz/MaximoIT90-License</u>\n - <u>https://ibm.biz/MAXArcGIS90-License</u>\n\nBe aware, this channel subscription is supported for non-production use only.   \nIt allows early access to new features for evaluation in non-production environments.   \nThis subscription is offered alongside and in parallel with our normal maintained streams.   \nWhen using this subscription, IBM Support will only accept cases for the latest available bundle deployed in a non-production environment.   \nSeverity must be either 3 or 4 and cases cannot be escalated.   \nPlease refer to IBM documentation for more details.\n",
+        }
+
+        self.upgrade_path = {
+            "9.0.x": "9.1.x-feature",
+            "8.11.x": "9.0.x",
+            "8.10.x": "8.11.x",
+            "8.9.x": "8.10.x",
         }
 
         self.spinner = {
@@ -264,6 +280,16 @@ class BaseApp(PrintMixin, PromptMixin):
         if self._isSNO is None:
             self._isSNO = isSNO(self.dynamicClient)
         return self._isSNO
+
+    @logMethodCall
+    def isAirgap(self):
+        if self._isAirgap is None:
+            # First check if the legacy ICSP is installed.  If it is raise an error and instruct the user to re-run configure-airgap to
+            # migrate the cluster from ICSP to IDMS
+            if isAirgapInstall(self.dynamicClient, checkICSP=True):
+                self.fatalError("Deprecated Maximo Application Suite ImageContentSourcePolicy detected on the target cluster.  Run 'mas configure-airgap' to migrate to the replacement ImageDigestMirrorSet beofre proceeding.")
+            self._isAirgap = isAirgapInstall(self.dynamicClient)
+        return self._isAirgap
 
     def setParam(self, param: str, value: str):
         self.params[param] = value
@@ -357,7 +383,7 @@ class BaseApp(PrintMixin, PromptMixin):
             self.fatalError(f"Unsupported worker node architecture: {self.architecture}")
 
     @logMethodCall
-    def initializeApprovalConfigMap(self, namespace: str, id: str, key: str = None, maxRetries: int = 100, delay: int = 300, ignoreFailure: bool = True) -> None:
+    def initializeApprovalConfigMap(self, namespace: str, id: str, enabled: bool, maxRetries: int = 100, delay: int = 300, ignoreFailure: bool = True) -> None:
         """
         Set key = None if you don't want approval workflow enabled
         """
@@ -373,8 +399,7 @@ class BaseApp(PrintMixin, PromptMixin):
                 "MAX_RETRIES": str(maxRetries),
                 "DELAY": str(delay),
                 "IGNORE_FAILURE": str(ignoreFailure),
-                "CONFIGMAP_KEY": key,
-                key: ""
+                "STATUS": ""
             }
         }
 
@@ -385,6 +410,6 @@ class BaseApp(PrintMixin, PromptMixin):
         except NotFoundError:
             pass
 
-        if key is not None:
-            logger.debug(f"Enabling approval workflow for {id} using {key} with {maxRetries} max retries on a {delay}s delay ({'ignoring failures' if ignoreFailure else 'abort on failure'})")
+        if enabled:
+            logger.debug(f"Enabling approval workflow for {id} with {maxRetries} max retries on a {delay}s delay ({'ignoring failures' if ignoreFailure else 'abort on failure'})")
             cmAPI.create(body=configMap, namespace=namespace)
